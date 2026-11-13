@@ -1179,6 +1179,45 @@ def test_missing_envvar(runner):
     assert result.exit_code == 2
     assert "Error: Missing option '--foo'." in result.output
 
+    result = runner.invoke(cli, auto_envvar_prefix="CLI")
+    assert result.exit_code == 2
+    assert "Error: Missing option '--foo' (env var: 'CLI_FOO')." in result.output
+
+
+def test_show_envvar_error_hint_auto_prefix(runner):
+    @click.command(context_settings={"auto_envvar_prefix": "MYAPP"})
+    @click.option("--port", type=int, required=True, show_envvar=True)
+    def cli(port):
+        click.echo(f"port={port}")
+
+    result = runner.invoke(cli, [])
+    assert result.exit_code == 2
+    assert "Error: Missing option '--port' (env var: 'MYAPP_PORT')." in result.output
+
+    result = runner.invoke(cli, ["--port", "not-a-number"])
+    assert result.exit_code == 2
+    assert (
+        "Error: Invalid value for '--port' (env var: 'MYAPP_PORT'):"
+        " 'not-a-number' is not a valid integer." in result.output
+    )
+
+
+def test_show_envvar_error_hint_auto_prefix_nested_command(runner):
+    @click.group(context_settings={"auto_envvar_prefix": "MYAPP"})
+    def cli():
+        pass
+
+    @cli.command()
+    @click.option("--host", required=True, show_envvar=True)
+    def serve(host):
+        pass
+
+    result = runner.invoke(cli, ["serve"])
+    assert result.exit_code == 2
+    assert (
+        "Error: Missing option '--host' (env var: 'MYAPP_SERVE_HOST')." in result.output
+    )
+
 
 @pytest.mark.parametrize(
     ("envvar", "expected"),
